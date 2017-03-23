@@ -122,13 +122,24 @@ var state = {
     updated: null
   }
 };
-
+var inputdest;
+var origin_coordinates;
+var destination;
+var locations;
+var optimizedroute;
+var decoderoute;
+var dest;
+var route;
+var destOnmap=null;
+var routeOnmap=null;
 /* We'll use underscore's `once` function to make sure this only happens
  *  one time even if weupdate the position later
  */
 var goToOrigin = _.once(function(lat, lng) {
   map.flyTo([lat, lng], 14);
+  origin_coordinates = [lat,lng];
 });
+
 
 
 /* Given a lat and a long, we should create a marker, store it
@@ -136,14 +147,13 @@ var goToOrigin = _.once(function(lat, lng) {
  */
 var updatePosition = function(lat, lng, updated) {
   if (state.position.marker) { map.removeLayer(state.position.marker); }
-  state.position.marker = L.circleMarker([lat, lng], {color: "blue"});
+  state.position.marker = L.circleMarker([lat, lng], {color: "#207f76"});
   state.position.updated = updated;
   state.position.marker.addTo(map);
   goToOrigin(lat, lng);
 };
 
-$(document).ready(function() {
-  /* This 'if' check allows us to safely ask for the user's current position */
+$(document).ready(function(){
   if ("geolocation" in navigator) {
     navigator.geolocation.getCurrentPosition(function(position) {
       updatePosition(position.coords.latitude, position.coords.longitude, position.timestamp);
@@ -151,7 +161,6 @@ $(document).ready(function() {
   } else {
     alert("Unable to access geolocation API!");
   }
-
 
   /* Every time a key is lifted while typing in the #dest input, disable
    * the #calculate button if no text is in the input
@@ -166,10 +175,31 @@ $(document).ready(function() {
 
   // click handler for the "calculate" button (probably you want to do something with this)
   $("#calculate").click(function(e) {
-    var dest = $('#dest').val();
-    console.log(dest);
-  });
-
+    if(destOnmap!==null){
+      map.removeLayer(destOnmap);
+    }
+    if(routeOnmap!==null){
+      map.removeLayer(routeOnmap);
+    }
+    dest = $('#dest').val();
+     console.log(dest);
+    destination = "http://search.mapzen.com/v1/search?api_key=mapzen-LYQZKGw&text="+ dest +
+    "&boundary.circle.lon=" + origin_coordinates[1]+"&boundary.circle.lat="+origin_coordinates[0]+"&boundary.circle.radius=10&size=1";
+    $.ajax(destination).done(function(data) {
+      inputdest = data.features[0].geometry.coordinates;
+      console.log(inputdest);
+    destOnmap = L.circleMarker([inputdest[1], inputdest[0]], {color: "#ff572a"}).addTo(map);
+    locations={"locations":[{"lat":origin_coordinates[0], "lon":origin_coordinates[1]},{"lat":inputdest[1],"lon":inputdest[0]}],
+    "costing":"auto","directions_options":{"units":"miles"}};
+    route="https://matrix.mapzen.com/optimized_route?json="+JSON.stringify(locations)+"&api_key=mapzen-LYQZKGw";
+    console.log(route);
+    $.ajax(route).done(function(data) {
+    optimizedroute = data.trip.legs[0].shape;
+    console.log(optimizedroute);
+    decoderoute = decode(optimizedroute);
+    console.log(decoderoute);
+    routeOnmap = L.polyline(decoderoute,{color: "#e8cc37"}).addTo(map);
+    });
+    });
 });
-
-
+});
